@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duck Race Randomizer</title>
+<style>
+  :root {
+    --grass-dark: #2e6b2e;
+    --grass-light: #3d8f3d;
+    --water-dark: #2f7fd6;
+    --water-light: #4a9ae8;
+    --page-bg: #12161d;
+    --panel-bg: #1c232e;
+    --panel-border: #333e4d;
+    --text-dark: #e6ebf1;
+    --text-muted: #8f9bab;
+    --neutral-bg: #2a3342;
+    --accent: #ff9800;
+    --danger: #ff6b6b;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    font-family: -apple-system, "Segoe UI", "Noto Sans Thai", Roboto, Arial, sans-serif;
+    background: var(--page-bg);
+    color: var(--text-dark);
+  }
+
+  .app {
+    max-width: 960px;
+    min-height: 100vh;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-weight: 600;
+    transition: filter 0.15s ease;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.07); }
+  button:active:not(:disabled) { filter: brightness(0.95); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary { background: var(--water-dark); color: #fff; }
+  .btn-danger { background: var(--danger); color: #1a1a1a; }
+  .btn-neutral { background: var(--neutral-bg); color: var(--text-dark); }
+
+  /* ===== SETUP / CONFIG PANELS ===== */
+  .card {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #setup-panel { flex: 1 1 auto; min-height: 0; }
+
+  .config-group { display: flex; flex-direction: column; gap: 8px; }
+  .config-label { font-size: 14px; font-weight: 600; }
+  .config-options { display: flex; gap: 8px; flex-wrap: wrap; }
+  .option-btn.active { background: var(--accent); color: #1a1a1a; }
+  #raceSecondsInput { width: 100%; accent-color: var(--accent); }
+
+  .names-input-wrap {
+    position: relative;
+    /* 24 lines at font-size 14px / line-height 1.5 (21px each) plus padding */
+    min-height: calc(24 * 1.5 * 14px + 20px);
+    flex: 1 1 auto;
+    display: flex;
+  }
+
+  .line-numbers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 38px;
+    padding: 10px 6px 10px 0;
+    overflow: hidden;
+    text-align: right;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    white-space: pre;
+    user-select: none;
+  }
+
+  #namesInput {
+    width: 100%;
+    flex: 1 1 auto;
+    resize: vertical;
+    padding: 10px 12px 10px 46px;
+    background: var(--page-bg);
+    color: var(--text-dark);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  #namesInput::placeholder { color: var(--text-muted); }
+
+  #setupMeta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+
+  .setup-actions { flex: 0 0 auto; }
+
+  #setupError {
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 18px;
+    flex: 0 0 auto;
+  }
+
+  /* ===== RACE TRACK ===== */
+  #race-track {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .grass {
+    height: 34px;
+    flex: 0 0 auto;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--grass-light) 0 24px,
+      var(--grass-dark) 24px 48px
+    );
+    border-bottom: 3px solid #2f6b2f;
+  }
+  .grass-bottom { border-top: 3px solid #2f6b2f; border-bottom: none; }
+
+  .lanes-container {
+    display: flex;
+    flex-direction: column;
+    background: repeating-linear-gradient(
+      180deg,
+      var(--water-light) 0 6px,
+      var(--water-dark) 6px 12px
+    );
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  .lane {
+    flex: 1 1 0;
+    min-height: 20px;
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid rgba(255,255,255,0.18);
+    position: relative;
+  }
+  .lane:last-child { border-bottom: none; }
+
+  .lane-name-gutter {
+    flex: 0 0 clamp(78px, 20%, 170px);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px 0 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.15);
+  }
+
+  .lane-number {
+    flex: 0 0 auto;
+    opacity: 0.75;
+  }
+
+  .lane-name-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lane-water {
+    position: relative;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .duck {
+    position: absolute;
+    top: 50%;
+    left: calc(var(--p, 0) * (100% - var(--duck-w, 34px)));
+    transform: translateY(-50%);
+    width: var(--duck-w, 34px);
+    height: var(--duck-w, 34px);
+    will-change: left;
+    z-index: 3;
+  }
+  .duck svg { width: 100%; height: 100%; display: block; }
+
+  .finish-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 14px;
+    background-image: repeating-conic-gradient(#161616 0% 25%, #f4f4f4 0% 50%);
+    background-size: 14px 14px;
+    z-index: 1;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+  }
+
+  /* ===== WINNER BANNER ===== */
+  #winnerBanner {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    padding: 16px;
+  }
+
+  .winner-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    text-align: center;
+    max-width: 90vw;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  }
+
+  .winner-card p {
+    margin: 0 0 18px;
+    font-size: clamp(18px, 5vw, 26px);
+    font-weight: 700;
+    overflow-wrap: break-word;
+  }
+
+  .winner-list {
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: left;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  .winner-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--neutral-bg);
+    overflow-wrap: break-word;
+  }
+  .winner-list .rank { flex: 0 0 auto; font-weight: 800; min-width: 28px; text-align: center; }
+  .winner-list li:nth-child(1) { background: linear-gradient(90deg, rgba(255,215,0,0.3), var(--neutral-bg)); }
+  .winner-list li:nth-child(2) { background: linear-gradient(90deg, rgba(200,200,210,0.25), var(--neutral-bg)); }
+  .winner-list li:nth-child(3) { background: linear-gradient(90deg, rgba(205,127,50,0.25), var(--neutral-bg)); }
+
+  /* ===== START DIALOG ===== */
+  /* Positioning applies always (harmless while closed); display is scoped to
+     [open] so the native `dialog:not([open]){display:none}` UA rule still
+     hides it by default -- an unscoped `display` here would outrank that
+     rule and leave the dialog visible before it's ever opened. */
+  #startDialog {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    background: var(--panel-bg);
+    color: var(--text-dark);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+    z-index: 20;
+    max-width: calc(100vw - 32px);
+  }
+  #startDialog[open] {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  #startDialog p { margin: 0; font-weight: 600; white-space: nowrap; }
+  #startDialog .dialog-secondary-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  #startBtn {
+    background: linear-gradient(180deg, #cc3b22 0%, #b71c1c 45%, #7a0c0c 100%);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    padding: 14px 40px;
+    border-radius: 999px;
+    border: 2px solid #5c0a0a;
+    box-shadow:
+      inset 0 2px 4px rgba(255,255,255,0.35),
+      inset 0 -6px 10px rgba(0,0,0,0.3),
+      0 6px 16px rgba(220,38,38,0.55);
+    animation: start-pulse 1.8s ease-in-out infinite;
+  }
+  #startBtn:active:not(:disabled) { transform: translateY(2px); }
+  #startBtn:disabled { animation: none; border-color: var(--panel-border); }
+
+  @keyframes start-pulse {
+    0%, 100% {
+      box-shadow:
+        inset 0 2px 4px rgba(255,255,255,0.35),
+        inset 0 -6px 10px rgba(0,0,0,0.3),
+        0 6px 16px rgba(220,38,38,0.55);
+    }
+    50% {
+      box-shadow:
+        inset 0 2px 4px rgba(255,255,255,0.35),
+        inset 0 -6px 10px rgba(0,0,0,0.3),
+        0 6px 26px rgba(220,38,38,0.9);
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <section id="setup-panel" class="card">
+    <div class="names-input-wrap">
+      <div class="line-numbers" id="lineNumbers" aria-hidden="true">1</div>
+      <textarea id="namesInput" aria-label="รายชื่อผู้เข้าแข่งขัน" placeholder="พิมพ์ชื่อ 1 ชื่อต่อ 1 บรรทัด เช่น&#10;สมชาย&#10;สมหญิง&#10;มานะ"></textarea>
+    </div>
+    <div id="setupMeta">
+      <span id="nameCount">0 ชื่อ</span>
+      <span>สูงสุด 60 ชื่อ</span>
+    </div>
+    <div id="setupError"></div>
+    <div class="setup-actions">
+      <button class="btn-primary" id="applyNamesBtn">Set Racers</button>
+      <button class="btn-neutral" id="openConfigBtn">⚙ ตั้งค่า</button>
+    </div>
+  </section>
+
+  <section id="config-panel" class="card" hidden>
+    <div class="config-group">
+      <div class="config-label">ธีมตัวละคร</div>
+      <div class="config-options" id="themeOptions">
+        <button type="button" class="btn-neutral option-btn" data-theme="duck">🦆 เป็ด</button>
+        <button type="button" class="btn-neutral option-btn" data-theme="car">🚗 รถ</button>
+        <button type="button" class="btn-neutral option-btn" data-theme="horse">🐎 ม้า</button>
+      </div>
+    </div>
+
+    <div class="config-group">
+      <div class="config-label">ระยะเวลาแข่งโดยประมาณ: <span id="raceSecondsValue">10</span> วินาที</div>
+      <input type="range" id="raceSecondsInput" aria-label="ระยะเวลาแข่งโดยประมาณ (วินาที)" min="3" max="30" step="1" value="10">
+    </div>
+
+    <div class="config-group">
+      <div class="config-label">แสดงลำดับเข้าเส้นชัย</div>
+      <div class="config-options" id="topNOptions">
+        <button type="button" class="btn-neutral option-btn" data-topn="1">Top 1</button>
+        <button type="button" class="btn-neutral option-btn" data-topn="3">Top 3</button>
+        <button type="button" class="btn-neutral option-btn" data-topn="10">Top 10</button>
+        <button type="button" class="btn-neutral option-btn" data-topn="all">ทั้งหมด</button>
+      </div>
+    </div>
+
+    <div class="setup-actions">
+      <button class="btn-primary" id="saveConfigBtn">บันทึก</button>
+    </div>
+  </section>
+
+  <section id="race-track" hidden>
+    <div class="grass grass-top"></div>
+    <div class="lanes-container" id="lanesContainer"></div>
+    <div class="grass grass-bottom"></div>
+    <div class="finish-line"></div>
+  </section>
+
+</div>
+
+<dialog id="startDialog">
+  <p>พร้อมแข่งแล้วหรือยัง?</p>
+  <div class="dialog-secondary-actions">
+    <button class="btn-neutral" id="shuffleBtn">Shuffle</button>
+    <button class="btn-neutral" id="editNamesBtn">Edit Names</button>
+  </div>
+  <button class="btn-primary" id="startBtn">Start</button>
+</dialog>
+
+<div id="winnerBanner" hidden>
+  <div class="winner-card">
+    <p id="winnerHeading"></p>
+    <ol class="winner-list" id="winnerList"></ol>
+    <button class="btn-primary" id="winnerCloseBtn">OK</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ===== CONSTANTS =====
+  var MAX_RACERS = 60;
+  var MAX_DT = 0.05; // max simulated sub-step size when catching up after a frame gap
+  var STORAGE_KEY = "duckRace.names";
+  var CONFIG_STORAGE_KEY = "duckRace.config";
+  var VALID_TOP_N = new Set([1, 3, 10, "all"]);
+  var VALID_THEMES = new Set(["duck", "car", "horse"]);
+
+  // ===== DOM REFS =====
+  var namesInput = document.getElementById("namesInput");
+  var lineNumbers = document.getElementById("lineNumbers");
+  var nameCountEl = document.getElementById("nameCount");
+  var setupError = document.getElementById("setupError");
+  var applyNamesBtn = document.getElementById("applyNamesBtn");
+  var setupPanel = document.getElementById("setup-panel");
+  var raceTrack = document.getElementById("race-track");
+  var lanesContainer = document.getElementById("lanesContainer");
+  var startDialog = document.getElementById("startDialog");
+  var startBtn = document.getElementById("startBtn");
+  var shuffleBtn = document.getElementById("shuffleBtn");
+  var editNamesBtn = document.getElementById("editNamesBtn");
+  var winnerBanner = document.getElementById("winnerBanner");
+  var winnerHeading = document.getElementById("winnerHeading");
+  var winnerList = document.getElementById("winnerList");
+  var winnerCloseBtn = document.getElementById("winnerCloseBtn");
+
+  var configPanel = document.getElementById("config-panel");
+  var openConfigBtn = document.getElementById("openConfigBtn");
+  var saveConfigBtn = document.getElementById("saveConfigBtn");
+  var themeOptions = document.getElementById("themeOptions");
+  var topNOptions = document.getElementById("topNOptions");
+  var raceSecondsInput = document.getElementById("raceSecondsInput");
+  var raceSecondsValue = document.getElementById("raceSecondsValue");
+
+  // ===== STATE =====
+  var racers = [];
+  var status = "idle"; // idle | running | finished
+  var rafId = null;
+  var lastFrameTime = 0;
+  var finishOrder = [];
+  var config = loadConfig();
+
+  // ===== CONFIG PERSISTENCE =====
+  function loadConfig() {
+    var defaults = { theme: "duck", raceSeconds: 10, topN: 1 };
+    try {
+      var saved = JSON.parse(localStorage.getItem(CONFIG_STORAGE_KEY));
+      if (
+        saved &&
+        VALID_THEMES.has(saved.theme) &&
+        saved.raceSeconds >= 3 && saved.raceSeconds <= 30 &&
+        VALID_TOP_N.has(saved.topN)
+      ) {
+        return saved;
+      }
+    } catch (e) { /* ignore malformed storage */ }
+    return defaults;
+  }
+
+  function saveConfig() {
+    try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config)); } catch (e) { /* ignore storage errors */ }
+  }
+
+  // ===== UTIL =====
+  function randRange(min, max) { return min + Math.random() * (max - min); }
+
+  function hslColor(index, offsetDeg) {
+    var hue = (index * 137.508 + (offsetDeg || 0)) % 360;
+    return "hsl(" + hue.toFixed(1) + ", 68%, 48%)";
+  }
+
+  var DUCK_SVG =
+    '<svg viewBox="0 0 100 70">' +
+    '<ellipse cx="42" cy="46" rx="30" ry="19" fill="currentColor"/>' +
+    '<ellipse cx="34" cy="44" rx="12" ry="8" fill="rgba(0,0,0,0.15)"/>' +
+    '<circle cx="74" cy="26" r="15" fill="currentColor"/>' +
+    '<polygon points="86,25 102,20 102,31" fill="#ffb300"/>' +
+    '<circle cx="79" cy="21" r="2.4" fill="#1a1a1a"/>' +
+    "</svg>";
+
+  var CAR_SVG =
+    '<svg viewBox="0 0 100 70">' +
+    '<rect x="8" y="30" width="84" height="22" rx="8" fill="currentColor"/>' +
+    '<path d="M24,30 L34,12 L66,12 L79,30 Z" fill="currentColor"/>' +
+    '<rect x="40" y="16" width="20" height="14" fill="rgba(255,255,255,0.35)"/>' +
+    '<circle cx="28" cy="54" r="10" fill="#1a1a1a"/>' +
+    '<circle cx="72" cy="54" r="10" fill="#1a1a1a"/>' +
+    '<circle cx="28" cy="54" r="4" fill="#666"/>' +
+    '<circle cx="72" cy="54" r="4" fill="#666"/>' +
+    "</svg>";
+
+  var HORSE_SVG =
+    '<svg viewBox="0 0 100 70">' +
+    '<ellipse cx="45" cy="38" rx="28" ry="14" fill="currentColor"/>' +
+    '<path d="M68,30 L85,8 L92,12 L79,34 Z" fill="currentColor"/>' +
+    '<polygon points="83,8 93,5 91,14" fill="currentColor"/>' +
+    '<path d="M28,26 Q17,15 8,19 Q16,28 24,30 Z" fill="currentColor"/>' +
+    '<rect x="18" y="48" width="6" height="18" fill="currentColor"/>' +
+    '<rect x="33" y="48" width="6" height="18" fill="currentColor"/>' +
+    '<rect x="54" y="48" width="6" height="18" fill="currentColor"/>' +
+    '<rect x="68" y="48" width="6" height="18" fill="currentColor"/>' +
+    "</svg>";
+
+  var RACER_SVGS = { duck: DUCK_SVG, car: CAR_SVG, horse: HORSE_SVG };
+
+  // ===== NAME PARSING / VALIDATION =====
+  function parseNames(raw) {
+    return raw
+      .split("\n")
+      .map(function (line) { return line.trim(); })
+      .filter(function (line) { return line.length > 0; });
+  }
+
+  function updateNameCount() {
+    var count = parseNames(namesInput.value).length;
+    nameCountEl.textContent = count + " ชื่อ";
+  }
+
+  function updateLineNumbers() {
+    var lineCount = namesInput.value.split("\n").length;
+    var lines = [];
+    for (var i = 1; i <= lineCount; i++) lines.push(i);
+    lineNumbers.textContent = lines.join("\n");
+  }
+
+  namesInput.addEventListener("input", function () {
+    updateNameCount();
+    updateLineNumbers();
+  });
+  namesInput.addEventListener("scroll", function () {
+    lineNumbers.scrollTop = namesInput.scrollTop;
+  });
+
+  // ===== LANE GENERATION =====
+  function buildLaneDom(racer) {
+    var lane = document.createElement("div");
+    lane.className = "lane";
+
+    var gutter = document.createElement("div");
+    gutter.className = "lane-name-gutter";
+    gutter.title = (racer.id + 1) + ". " + racer.name;
+
+    var numberEl = document.createElement("span");
+    numberEl.className = "lane-number";
+    numberEl.textContent = (racer.id + 1) + ".";
+    gutter.appendChild(numberEl);
+
+    var nameEl = document.createElement("span");
+    nameEl.className = "lane-name-text";
+    nameEl.textContent = racer.name;
+    gutter.appendChild(nameEl);
+
+    lane.appendChild(gutter);
+
+    var water = document.createElement("div");
+    water.className = "lane-water";
+
+    var duck = document.createElement("div");
+    duck.className = "duck";
+    duck.style.color = racer.color;
+    duck.style.setProperty("--p", "0");
+    duck.innerHTML = RACER_SVGS[config.theme] || DUCK_SVG;
+    water.appendChild(duck);
+
+    lane.appendChild(water);
+    return { lane: lane, water: water, duck: duck, gutter: gutter, numberEl: numberEl };
+  }
+
+  function sizeDucks() {
+    racers.forEach(function (r) {
+      var laneHeight = r.dom.lane.clientHeight;
+      var size = Math.max(20, Math.min(38, Math.round(laneHeight * 0.72)));
+      r.dom.duck.style.setProperty("--duck-w", size + "px");
+    });
+  }
+
+  function generateLanes(names) {
+    lanesContainer.innerHTML = "";
+    racers = names.map(function (name, i) {
+      return {
+        id: i,
+        name: name,
+        color: hslColor(i, 0),
+        progress: 0,
+        finished: false,
+        speedTarget: 1,
+        segmentRemaining: 0,
+        dom: null
+      };
+    });
+
+    racers.forEach(function (racer) {
+      var dom = buildLaneDom(racer);
+      racer.dom = dom;
+      lanesContainer.appendChild(dom.lane);
+    });
+
+    requestAnimationFrame(sizeDucks);
+
+    setupPanel.hidden = true;
+    raceTrack.hidden = false;
+
+    resetPositions();
+    updateStartButtonState();
+    openStartDialog();
+  }
+
+  // ===== RACE MECHANICS =====
+  function updateDuckDom(racer) {
+    racer.dom.duck.style.setProperty("--p", String(racer.progress));
+  }
+
+  function rollNewSegment(racer) {
+    racer.speedTarget = randRange(0.1, 1.9);
+    racer.segmentRemaining = randRange(0.4, 1.0);
+  }
+
+  function resetPositions() {
+    racers.forEach(function (r) {
+      r.progress = 0;
+      r.finished = false;
+      updateDuckDom(r);
+    });
+    finishOrder = [];
+    winnerBanner.hidden = true;
+  }
+
+  function updateStartButtonState() {
+    startBtn.disabled = racers.length === 0 || status === "running";
+  }
+
+  function openStartDialog() {
+    if (racers.length === 0 || status === "running") return;
+    if (!startDialog.open) startDialog.show();
+  }
+
+  function closeStartDialog() {
+    if (startDialog.open) startDialog.close();
+  }
+
+  // Advances every unfinished racer by `dt` seconds and returns racers that
+  // crossed the finish line during this step (usually 0, sometimes several).
+  function advance(dt) {
+    var baseSpeed = 1 / config.raceSeconds; // progress-per-second at speed multiplier 1
+    var crossers = [];
+    for (var i = 0; i < racers.length; i++) {
+      var r = racers[i];
+      if (r.finished) continue;
+
+      r.segmentRemaining -= dt;
+      if (r.segmentRemaining <= 0) rollNewSegment(r);
+
+      var prevProgress = r.progress;
+      var rawNew = prevProgress + baseSpeed * r.speedTarget * dt;
+
+      if (rawNew >= 1) {
+        var fraction = (1 - prevProgress) / (rawNew - prevProgress);
+        r.progress = 1;
+        r.finished = true;
+        crossers.push({ racer: r, fraction: fraction });
+      } else {
+        r.progress = rawNew;
+      }
+      updateDuckDom(r);
+    }
+    return crossers;
+  }
+
+  function tick(now) {
+    // Real elapsed time since the previous frame. This can be far larger than
+    // one frame's worth (e.g. the tab was backgrounded/throttled), so it is
+    // replayed below in small sub-steps rather than clamped and discarded --
+    // clamping here would silently let the race drift out of real time.
+    var rawDt = (now - lastFrameTime) / 1000;
+    lastFrameTime = now;
+    if (rawDt < 0) rawDt = 0; // guard against clock anomalies
+
+    // Safety cap on total catch-up work for one callback (many multiples of
+    // any realistic race length), so an extreme gap can't hang the tab.
+    var remaining = Math.min(rawDt, 600);
+    var neededFinishers = config.topN === "all" ? racers.length : Math.min(config.topN, racers.length);
+
+    while (remaining > 0 && finishOrder.length < neededFinishers) {
+      var step = Math.min(remaining, MAX_DT);
+      remaining -= step;
+      var crossers = advance(step);
+      if (crossers.length > 0) {
+        crossers.sort(function (a, b) { return a.fraction - b.fraction; });
+        for (var c of crossers) finishOrder.push(c.racer);
+      }
+    }
+
+    if (finishOrder.length >= neededFinishers) {
+      declareResults();
+      return;
+    }
+
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function declareResults() {
+    status = "finished";
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+
+    var medals = ["🥇", "🥈", "🥉"];
+    winnerHeading.textContent = finishOrder.length === 1 ? "🎉 ผู้ชนะคือ 🎉" : "🎉 ผลการแข่งขัน 🎉";
+    winnerList.innerHTML = "";
+    finishOrder.forEach(function (racer, i) {
+      var li = document.createElement("li");
+      var rank = document.createElement("span");
+      rank.className = "rank";
+      rank.textContent = medals[i] || (i + 1) + ".";
+      var name = document.createElement("span");
+      name.textContent = racer.name;
+      li.appendChild(rank);
+      li.appendChild(name);
+      winnerList.appendChild(li);
+    });
+
+    winnerBanner.hidden = false;
+    updateStartButtonState();
+  }
+
+  function startRace() {
+    if (status === "running" || racers.length === 0) return;
+    closeStartDialog();
+    if (rafId) cancelAnimationFrame(rafId);
+    resetPositions();
+    racers.forEach(rollNewSegment);
+    status = "running";
+    lastFrameTime = performance.now();
+    updateStartButtonState();
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function clearRace() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    status = "idle";
+    resetPositions();
+    updateStartButtonState();
+  }
+
+  function shuffleNames() {
+    if (status === "running") return;
+    for (var i = racers.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = racers[i];
+      racers[i] = racers[j];
+      racers[j] = tmp;
+    }
+    racers.forEach(function (r, i) {
+      r.id = i;
+      r.dom.numberEl.textContent = (i + 1) + ".";
+      r.dom.gutter.title = (i + 1) + ". " + r.name;
+      lanesContainer.appendChild(r.dom.lane);
+    });
+  }
+
+  // ===== CONFIG PANEL UI =====
+  function setActiveOption(container, dataKey, value) {
+    container.querySelectorAll(".option-btn").forEach(function (btn) {
+      btn.classList.toggle("active", btn.dataset[dataKey] === value);
+    });
+  }
+
+  function renderConfigUI() {
+    setActiveOption(themeOptions, "theme", config.theme);
+    setActiveOption(topNOptions, "topn", String(config.topN));
+    raceSecondsInput.value = config.raceSeconds;
+    raceSecondsValue.textContent = config.raceSeconds;
+  }
+
+  themeOptions.addEventListener("click", function (e) {
+    var btn = e.target.closest(".option-btn");
+    if (!btn) return;
+    config.theme = btn.dataset.theme;
+    setActiveOption(themeOptions, "theme", config.theme);
+  });
+
+  topNOptions.addEventListener("click", function (e) {
+    var btn = e.target.closest(".option-btn");
+    if (!btn) return;
+    config.topN = btn.dataset.topn === "all" ? "all" : Number.parseInt(btn.dataset.topn, 10);
+    setActiveOption(topNOptions, "topn", String(config.topN));
+  });
+
+  raceSecondsInput.addEventListener("input", function () {
+    config.raceSeconds = Number.parseInt(raceSecondsInput.value, 10);
+    raceSecondsValue.textContent = config.raceSeconds;
+  });
+
+  openConfigBtn.addEventListener("click", function () {
+    renderConfigUI();
+    setupPanel.hidden = true;
+    configPanel.hidden = false;
+  });
+
+  saveConfigBtn.addEventListener("click", function () {
+    saveConfig();
+    configPanel.hidden = true;
+    setupPanel.hidden = false;
+  });
+
+  // ===== EVENT WIRING =====
+  applyNamesBtn.addEventListener("click", function () {
+    var names = parseNames(namesInput.value);
+    if (names.length === 0) {
+      setupError.textContent = "กรุณากรอกอย่างน้อย 1 ชื่อ";
+      return;
+    }
+    var truncated = names.length > MAX_RACERS;
+    if (truncated) names = names.slice(0, MAX_RACERS);
+    setupError.textContent = truncated
+      ? "กรอกเกิน " + MAX_RACERS + " ชื่อ ระบบใช้ " + MAX_RACERS + " ชื่อแรกเท่านั้น"
+      : "";
+
+    try { localStorage.setItem(STORAGE_KEY, namesInput.value); } catch (e) { /* ignore storage errors */ }
+
+    generateLanes(names);
+  });
+
+  startBtn.addEventListener("click", startRace);
+  shuffleBtn.addEventListener("click", shuffleNames);
+
+  editNamesBtn.addEventListener("click", function () {
+    clearRace();
+    closeStartDialog();
+    raceTrack.hidden = true;
+    setupPanel.hidden = false;
+  });
+
+  winnerCloseBtn.addEventListener("click", function () {
+    winnerBanner.hidden = true;
+    openStartDialog();
+  });
+
+  // restore last-used name list (raw text only, not auto-applied)
+  try {
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) namesInput.value = saved;
+  } catch (e) { /* ignore storage errors */ }
+  updateNameCount();
+  updateLineNumbers();
+})();
+</script>
+</body>
+</html>
