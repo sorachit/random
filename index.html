@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Duck Race Randomizer</title>
+<title>Race Randomizer</title>
 <style>
   :root {
     --grass-dark: #2e6b2e;
     --grass-light: #3d8f3d;
+    --grass-border: #2f6b2f;
     --water-dark: #2f7fd6;
     --water-light: #4a9ae8;
     --page-bg: #12161d;
@@ -166,9 +167,31 @@
       var(--grass-light) 0 24px,
       var(--grass-dark) 24px 48px
     );
-    border-bottom: 3px solid #2f6b2f;
+    border-bottom: 3px solid var(--grass-border);
   }
-  .grass-bottom { border-top: 3px solid #2f6b2f; border-bottom: none; }
+  .grass-bottom { border-top: 3px solid var(--grass-border); border-bottom: none; }
+
+  /* ===== TRACK THEMES ===== */
+  #race-track[data-theme="horse"] {
+    --grass-border: #efe6cf;
+    --water-dark: #a9784f;
+    --water-light: #c9986a;
+  }
+
+  #race-track[data-theme="car"] {
+    --grass-dark: #ececec;
+    --grass-light: #d94d4d;
+    --grass-border: #262626;
+    --water-dark: #3a3a3a;
+    --water-light: #4a4a4a;
+  }
+
+  #race-track[data-theme="car"] .lane-water {
+    background-image: repeating-linear-gradient(to right, rgba(255,255,255,0.6) 0 16px, transparent 16px 34px);
+    background-size: 100% 3px;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
 
   .lanes-container {
     display: flex;
@@ -581,9 +604,14 @@
     lineNumbers.textContent = lines.join("\n");
   }
 
+  function saveNames() {
+    try { localStorage.setItem(STORAGE_KEY, namesInput.value); } catch (e) { /* ignore storage errors */ }
+  }
+
   namesInput.addEventListener("input", function () {
     updateNameCount();
     updateLineNumbers();
+    saveNames();
   });
   namesInput.addEventListener("scroll", function () {
     lineNumbers.scrollTop = namesInput.scrollTop;
@@ -634,6 +662,7 @@
 
   function generateLanes(names) {
     lanesContainer.innerHTML = "";
+    raceTrack.dataset.theme = config.theme;
     racers = names.map(function (name, i) {
       return {
         id: i,
@@ -835,6 +864,7 @@
     if (!btn) return;
     config.theme = btn.dataset.theme;
     setActiveOption(themeOptions, "theme", config.theme);
+    saveConfig();
   });
 
   topNOptions.addEventListener("click", function (e) {
@@ -842,11 +872,13 @@
     if (!btn) return;
     config.topN = btn.dataset.topn === "all" ? "all" : Number.parseInt(btn.dataset.topn, 10);
     setActiveOption(topNOptions, "topn", String(config.topN));
+    saveConfig();
   });
 
   raceSecondsInput.addEventListener("input", function () {
     config.raceSeconds = Number.parseInt(raceSecondsInput.value, 10);
     raceSecondsValue.textContent = config.raceSeconds;
+    saveConfig();
   });
 
   openConfigBtn.addEventListener("click", function () {
@@ -874,7 +906,7 @@
       ? "กรอกเกิน " + MAX_RACERS + " ชื่อ ระบบใช้ " + MAX_RACERS + " ชื่อแรกเท่านั้น"
       : "";
 
-    try { localStorage.setItem(STORAGE_KEY, namesInput.value); } catch (e) { /* ignore storage errors */ }
+    saveNames();
 
     generateLanes(names);
   });
