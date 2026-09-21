@@ -205,6 +205,39 @@
     background-size: 48px 36px;
   }
 
+  /* Cat theme: warm carpet colors instead of grass/water. */
+  #race-track[data-theme="cat"] {
+    --grass-dark: #7a3626;
+    --grass-light: #9c4b34;
+    --grass-border: #4a2318;
+    --water-dark: #c0392b;
+    --water-light: #e2624a;
+  }
+
+  /* Fringe/tassel edge on the carpet's top and bottom border, made of a
+     zigzag triangle strip (two complementary diagonal gradients) that only
+     occupies the carpet-facing edge of the bar -- the rest of the bar falls
+     through to the striped base layer underneath. */
+  #race-track[data-theme="cat"] .grass {
+    background-image:
+      linear-gradient(45deg, var(--grass-border) 50%, transparent 50%),
+      linear-gradient(-45deg, var(--grass-border) 50%, transparent 50%),
+      repeating-linear-gradient(90deg, var(--grass-light) 0 20px, var(--grass-dark) 20px 40px);
+    background-size: 16px 16px, 16px 16px, 40px 100%;
+    background-repeat: repeat-x, repeat-x, repeat;
+  }
+  #race-track[data-theme="cat"] .grass-top { background-position: 0 bottom, 0 bottom, 0 0; }
+  #race-track[data-theme="cat"] .grass-bottom { background-position: 0 top, 0 top, 0 0; }
+
+  /* Diagonal crosshatch weave over the warm striped base -- reads as a
+     woven carpet texture. */
+  #race-track[data-theme="cat"] .lane-water {
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0 4px, transparent 4px 16px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,0.14) 0 4px, transparent 4px 16px);
+    background-repeat: repeat;
+  }
+
   .lanes-container {
     display: flex;
     flex-direction: column;
@@ -350,6 +383,31 @@
 
   #race-track[data-theme="horse"] .horse-mane,
   #race-track[data-theme="horse"] .horse-tail {
+    animation: horse-flow 0.3s ease-in-out infinite;
+    animation-delay: var(--bob-delay, 0s);
+  }
+
+  /* Cat theme: runs with the same quick bob as the horse, while its two
+     front legs kick back and forth in an alternating stride and its tail
+     flicks along on its own faster cycle. */
+  #race-track[data-theme="cat"] .duck-bob {
+    animation: char-bob 0.4s ease-in-out infinite;
+    animation-delay: var(--bob-delay, 0s);
+  }
+
+  @keyframes cat-run {
+    0%, 100% { transform: rotate(-18deg); }
+    50% { transform: rotate(18deg); }
+  }
+
+  #race-track[data-theme="cat"] .cat-leg-left,
+  #race-track[data-theme="cat"] .cat-leg-right {
+    animation: cat-run 0.4s ease-in-out infinite;
+  }
+  #race-track[data-theme="cat"] .cat-leg-left { animation-delay: var(--bob-delay, 0s); }
+  #race-track[data-theme="cat"] .cat-leg-right { animation-delay: calc(var(--bob-delay, 0s) + 0.2s); }
+
+  #race-track[data-theme="cat"] .cat-tail {
     animation: horse-flow 0.3s ease-in-out infinite;
     animation-delay: var(--bob-delay, 0s);
   }
@@ -536,6 +594,7 @@
         <button type="button" class="btn-neutral option-btn" data-theme="car">🚗 รถ</button>
         <button type="button" class="btn-neutral option-btn" data-theme="horse">🐎 ม้า</button>
         <button type="button" class="btn-neutral option-btn" data-theme="worm">🐛 หนอน</button>
+        <button type="button" class="btn-neutral option-btn" data-theme="cat">🐱 แมว</button>
       </div>
     </div>
 
@@ -600,7 +659,7 @@
   var STORAGE_KEY = "duckRace.names";
   var CONFIG_STORAGE_KEY = "duckRace.config";
   var VALID_TOP_N = new Set([1, 3, 10, "all"]);
-  var VALID_THEMES = new Set(["duck", "car", "horse", "worm"]);
+  var VALID_THEMES = new Set(["duck", "car", "horse", "worm", "cat"]);
 
   // ===== DOM REFS =====
   var namesInput = document.getElementById("namesInput");
@@ -728,7 +787,36 @@
     '<path d="M74,47 Q78,50.5 82,47" stroke="#1a1a1a" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
     "</svg>";
 
-  var RACER_SVGS = { duck: DUCK_SVG, car: CAR_SVG, horse: HORSE_SVG, worm: WORM_SVG };
+  var CAT_SVG =
+    '<svg viewBox="0 0 100 70">' +
+    // Tail curls out to the side; flicks independently (see cat-tail).
+    '<path class="cat-tail" style="transform-origin:79px 40px;" d="M78,46 Q95,42 93,24 Q90,35 79,39 Z" fill="currentColor"/>' +
+    // Ears (outer + lighter inner triangle) sit atop the round head.
+    '<path d="M28,18 L19,3 L38,14 Z" fill="currentColor"/>' +
+    '<path d="M63,14 L73,1 L77,18 Z" fill="currentColor"/>' +
+    '<path d="M29,14.5 L24,6 L34,12.5 Z" fill="rgba(255,255,255,0.5)"/>' +
+    '<path d="M68,12.5 L73,5 L74,14.5 Z" fill="rgba(255,255,255,0.5)"/>' +
+    // Round body, near-circular so the roll animation reads as a ball.
+    '<ellipse cx="50" cy="40" rx="30" ry="27" fill="currentColor"/>' +
+    '<ellipse cx="50" cy="53" rx="16" ry="13" fill="rgba(255,255,255,0.85)"/>' +
+    '<circle cx="29" cy="42" r="5" fill="rgba(255,255,255,0.35)"/>' +
+    '<circle cx="71" cy="42" r="5" fill="rgba(255,255,255,0.35)"/>' +
+    '<circle cx="38" cy="36" r="3" fill="#1a1a1a"/>' +
+    '<circle cx="62" cy="36" r="3" fill="#1a1a1a"/>' +
+    '<path d="M44,46 Q50,50 56,46" stroke="#1a1a1a" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+    // Front paws with small claw-mark lines, each its own leg that kicks
+    // back and forth in an alternating running stride (see cat-run).
+    '<g class="cat-leg cat-leg-left" style="transform-origin:37px 58px;">' +
+    '<ellipse cx="37" cy="64" rx="8" ry="6" fill="currentColor"/>' +
+    '<path d="M34,61 L34,66 M37,60 L37,66 M40,61 L40,66" stroke="rgba(0,0,0,0.3)" stroke-width="1" stroke-linecap="round"/>' +
+    '</g>' +
+    '<g class="cat-leg cat-leg-right" style="transform-origin:63px 58px;">' +
+    '<ellipse cx="63" cy="64" rx="8" ry="6" fill="currentColor"/>' +
+    '<path d="M60,61 L60,66 M63,60 L63,66 M66,61 L66,66" stroke="rgba(0,0,0,0.3)" stroke-width="1" stroke-linecap="round"/>' +
+    '</g>' +
+    "</svg>";
+
+  var RACER_SVGS = { duck: DUCK_SVG, car: CAR_SVG, horse: HORSE_SVG, worm: WORM_SVG, cat: CAT_SVG };
 
   // ===== NAME PARSING / VALIDATION =====
   function parseNames(raw) {
