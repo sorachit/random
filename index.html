@@ -246,8 +246,21 @@
   .lane-water {
     position: relative;
     flex: 1 1 auto;
-    overflow: hidden;
+    /* Vertical overflow is intentionally not clipped: an enlarged character
+       (see charScale) is allowed to spill into neighboring lanes rather than
+       being clipped to its own. Horizontal overflow IS clipped (via `clip`,
+       not `hidden`, so it doesn't force overflow-y to `auto` and add a
+       scrollbar) -- a finished duck sits flush with the right edge, and the
+       bob animation's rotate() would otherwise poke a few px past it. */
+    overflow-x: clip;
+    overflow-y: visible;
   }
+  /* The first/last lane have no neighbor above/below to spill into, so an
+     enlarged character there would poke past the whole track instead --
+     that extra height gets counted in #lanesContainer's scrollable area and
+     forces an unwanted vertical scrollbar. Clip just those two edges. */
+  .lane:first-child > .lane-water { overflow-y: clip; }
+  .lane:last-child > .lane-water { overflow-y: clip; }
 
   .duck {
     position: absolute;
@@ -259,7 +272,33 @@
     will-change: left;
     z-index: 3;
   }
-  .duck svg { width: 100%; height: 100%; display: block; }
+  .duck-bob {
+    width: 100%;
+    height: 100%;
+    animation: char-bob 0.7s ease-in-out infinite;
+    animation-delay: var(--bob-delay, 0s);
+    transform-origin: 50% 65%;
+  }
+  .duck-bob svg { width: 100%; height: 100%; display: block; }
+
+  @keyframes char-bob {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-8%) rotate(-4deg); }
+  }
+
+  .duck-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: calc(var(--duck-w, 34px) * 0.34);
+    font-weight: 800;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.85);
+    pointer-events: none;
+    z-index: 4;
+  }
 
   .finish-line {
     position: absolute;
@@ -435,6 +474,11 @@
     </div>
 
     <div class="config-group">
+      <div class="config-label">ขนาดตัวละคร: <span id="charScaleValue">100</span>%</div>
+      <input type="range" id="charScaleInput" aria-label="ขนาดตัวละคร (%)" min="100" max="200" step="10" value="100">
+    </div>
+
+    <div class="config-group">
       <div class="config-label">แสดงลำดับเข้าเส้นชัย</div>
       <div class="config-options" id="topNOptions">
         <button type="button" class="btn-neutral option-btn" data-topn="1">Top 1</button>
@@ -512,6 +556,8 @@
   var topNOptions = document.getElementById("topNOptions");
   var raceSecondsInput = document.getElementById("raceSecondsInput");
   var raceSecondsValue = document.getElementById("raceSecondsValue");
+  var charScaleInput = document.getElementById("charScaleInput");
+  var charScaleValue = document.getElementById("charScaleValue");
 
   // ===== STATE =====
   var racers = [];
@@ -523,14 +569,15 @@
 
   // ===== CONFIG PERSISTENCE =====
   function loadConfig() {
-    var defaults = { theme: "duck", raceSeconds: 10, topN: 1 };
+    var defaults = { theme: "duck", raceSeconds: 10, topN: 1, charScale: 1 };
     try {
       var saved = JSON.parse(localStorage.getItem(CONFIG_STORAGE_KEY));
       if (
         saved &&
         VALID_THEMES.has(saved.theme) &&
         saved.raceSeconds >= 3 && saved.raceSeconds <= 30 &&
-        VALID_TOP_N.has(saved.topN)
+        VALID_TOP_N.has(saved.topN) &&
+        saved.charScale >= 1 && saved.charScale <= 2
       ) {
         return saved;
       }
@@ -645,17 +692,33 @@
     duck.className = "duck";
     duck.style.color = racer.color;
     duck.style.setProperty("--p", "0");
-    duck.innerHTML = RACER_SVGS[config.theme] || DUCK_SVG;
+
+    var bob = document.createElement("div");
+    bob.className = "duck-bob";
+    // stagger so racers don't all bob in lockstep
+    bob.style.setProperty("--bob-delay", (-(racer.id % 6) * 0.12) + "s");
+    bob.innerHTML = RACER_SVGS[config.theme] || DUCK_SVG;
+    duck.appendChild(bob);
+
+    var numberBadge = document.createElement("span");
+    numberBadge.className = "duck-number";
+    numberBadge.textContent = String(racer.id + 1);
+    bob.appendChild(numberBadge);
+
     water.appendChild(duck);
 
     lane.appendChild(water);
-    return { lane: lane, water: water, duck: duck, gutter: gutter, numberEl: numberEl };
+    return { lane: lane, water: water, duck: duck, gutter: gutter, numberEl: numberEl, numberBadge: numberBadge };
   }
 
   function sizeDucks() {
+    var scale = config.charScale || 1;
     racers.forEach(function (r) {
       var laneHeight = r.dom.lane.clientHeight;
-      var size = Math.max(20, Math.min(38, Math.round(laneHeight * 0.72)));
+      // charScale is a direct multiple of one lane's height: 100% fills
+      // exactly one lane, 200% is exactly two lanes tall (and so on), so the
+      // slider reads as "how many slots tall" regardless of racer count.
+      var size = Math.max(14, Math.round(laneHeight * scale));
       r.dom.duck.style.setProperty("--duck-w", size + "px");
     });
   }
@@ -840,6 +903,7 @@
     racers.forEach(function (r, i) {
       r.id = i;
       r.dom.numberEl.textContent = (i + 1) + ".";
+      r.dom.numberBadge.textContent = String(i + 1);
       r.dom.gutter.title = (i + 1) + ". " + r.name;
       lanesContainer.appendChild(r.dom.lane);
     });
@@ -857,6 +921,8 @@
     setActiveOption(topNOptions, "topn", String(config.topN));
     raceSecondsInput.value = config.raceSeconds;
     raceSecondsValue.textContent = config.raceSeconds;
+    charScaleInput.value = Math.round(config.charScale * 100);
+    charScaleValue.textContent = Math.round(config.charScale * 100);
   }
 
   themeOptions.addEventListener("click", function (e) {
@@ -878,6 +944,12 @@
   raceSecondsInput.addEventListener("input", function () {
     config.raceSeconds = Number.parseInt(raceSecondsInput.value, 10);
     raceSecondsValue.textContent = config.raceSeconds;
+    saveConfig();
+  });
+
+  charScaleInput.addEventListener("input", function () {
+    config.charScale = Number.parseInt(charScaleInput.value, 10) / 100;
+    charScaleValue.textContent = charScaleInput.value;
     saveConfig();
   });
 
