@@ -319,6 +319,41 @@
     35%, 55% { transform: translate(var(--seg-tx, 0px), var(--seg-ty, 0px)); }
   }
 
+  /* Horse theme: legs swing through a galloping stride (front/back pairs
+     alternating) instead of hanging stiff under the generic bob, and the
+     mane/tail flutter on their own faster cycle as if caught in the wind. */
+  #race-track[data-theme="horse"] .duck-bob {
+    animation: char-bob 0.4s ease-in-out infinite;
+    animation-delay: var(--bob-delay, 0s);
+  }
+
+  @keyframes horse-gallop {
+    0%, 100% { transform: rotate(-22deg); }
+    50% { transform: rotate(22deg); }
+  }
+
+  #race-track[data-theme="horse"] .horse-leg-back,
+  #race-track[data-theme="horse"] .horse-leg-back2,
+  #race-track[data-theme="horse"] .horse-leg-front,
+  #race-track[data-theme="horse"] .horse-leg-front2 {
+    animation: horse-gallop 0.4s ease-in-out infinite;
+  }
+  #race-track[data-theme="horse"] .horse-leg-back { animation-delay: var(--bob-delay, 0s); }
+  #race-track[data-theme="horse"] .horse-leg-back2 { animation-delay: calc(var(--bob-delay, 0s) + 0.05s); }
+  #race-track[data-theme="horse"] .horse-leg-front { animation-delay: calc(var(--bob-delay, 0s) - 0.2s); }
+  #race-track[data-theme="horse"] .horse-leg-front2 { animation-delay: calc(var(--bob-delay, 0s) - 0.15s); }
+
+  @keyframes horse-flow {
+    0%, 100% { transform: rotate(-5deg); }
+    50% { transform: rotate(6deg); }
+  }
+
+  #race-track[data-theme="horse"] .horse-mane,
+  #race-track[data-theme="horse"] .horse-tail {
+    animation: horse-flow 0.3s ease-in-out infinite;
+    animation-delay: var(--bob-delay, 0s);
+  }
+
   .duck-number {
     position: absolute;
     top: 50%;
@@ -655,14 +690,22 @@
 
   var HORSE_SVG =
     '<svg viewBox="0 0 100 70">' +
+    // Tail and mane get their own class + transform-origin (pivoting from
+    // where they attach to the body/neck) so they can flutter independently
+    // of the galloping legs below (see horse-flow / horse-gallop).
+    '<path class="horse-tail" style="transform-origin:28px 26px;" d="M28,26 Q19,13 6,10 Q10,22 4,30 Q14,33 22,29 Q26,27 28,26 Z" fill="currentColor"/>' +
     '<ellipse cx="45" cy="38" rx="28" ry="14" fill="currentColor"/>' +
     '<path d="M68,30 L85,8 L92,12 L79,34 Z" fill="currentColor"/>' +
+    '<path class="horse-mane" style="transform-origin:78px 16px;" d="M70,30 Q64,20 72,8 Q80,2 90,6 Q80,10 78,18 Q84,22 78,28 Z" fill="rgba(255,255,255,0.55)"/>' +
     '<polygon points="83,8 93,5 91,14" fill="currentColor"/>' +
-    '<path d="M28,26 Q17,15 8,19 Q16,28 24,30 Z" fill="currentColor"/>' +
-    '<rect x="18" y="48" width="6" height="18" fill="currentColor"/>' +
-    '<rect x="33" y="48" width="6" height="18" fill="currentColor"/>' +
-    '<rect x="54" y="48" width="6" height="18" fill="currentColor"/>' +
-    '<rect x="68" y="48" width="6" height="18" fill="currentColor"/>' +
+    // Legs are split into back (near tail) / front (near head) pairs, each
+    // wrapped in its own <g> with a hip-level transform-origin, so CSS can
+    // swing them through a gallop stride instead of just holding them stiff
+    // while the body bobs (see horse-gallop below).
+    '<g class="horse-leg horse-leg-back" style="transform-origin:21px 48px;"><rect x="18" y="48" width="6" height="18" fill="currentColor"/></g>' +
+    '<g class="horse-leg horse-leg-back2" style="transform-origin:36px 48px;"><rect x="33" y="48" width="6" height="18" fill="currentColor"/></g>' +
+    '<g class="horse-leg horse-leg-front" style="transform-origin:57px 48px;"><rect x="54" y="48" width="6" height="18" fill="currentColor"/></g>' +
+    '<g class="horse-leg horse-leg-front2" style="transform-origin:71px 48px;"><rect x="68" y="48" width="6" height="18" fill="currentColor"/></g>' +
     "</svg>";
 
   var WORM_SVG =
